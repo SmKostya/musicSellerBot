@@ -8,16 +8,15 @@ const server = require("./serverConfig");
 const telegram = require("./telegram");
 
 
-mysql.createPool(server);
+// Подключение бота и базы данных
+
+var pool = mysql.createPool(server);
 var bot = new TelegramBot(telegram, {
     polling: true
 });
-var PORT = 3306;
-var app = express();
-app.listen(PORT, function () {
-    console.log('Server is running on port ' + PORT);
-});
 
+
+// Отправка сообщения через время
 
 function sendTime(time, chatId, text, options) {
     new schedule.scheduleJob({
@@ -29,6 +28,8 @@ function sendTime(time, chatId, text, options) {
     });
 }
 
+
+// Меню пользователя и админа
 var menu = {
     parse_mode: "HTML",
     reply_markup: {
@@ -54,6 +55,8 @@ var adminMenu = {
     }
 };
 
+
+// Создание, удаление, сброс таблиц SQL
 
 function delete_bits_db(chatId) {
     var sql1 = "DROP TABLE IF EXISTS bits";
@@ -108,6 +111,71 @@ function create_bits_db(chatId) {
         connection.release();
     });
 }
+
+function create_users_db(chatId) {
+    let sql2 = "CREATE TABLE users " +
+        "(user_id VARCHAR(255), " +
+        "request_status VARCHAR(255), " +
+        "totalSpent VARCHAR(250), " +
+        "admin VARCHAR(20)," +
+        "phone VARCHAR(50)," +
+        "Id INT not null AUTO_INCREMENT, " +
+        " PRIMARY KEY (Id))";
+    pool.getConnection(function (err, connection) {
+        connection.query(sql2, function (err) {
+            if (err) {
+                bot.sendMessage(chatId, "Что то пошло не так...");
+                throw err;
+            } else {
+                bot.sendMessage(chatId, "База пользователей успешно создана.");
+            }
+        });
+        connection.release();
+    });
+}
+
+function turncate_users_db(msg) {
+
+    let sql2 = "TRUNCATE TABLE users";
+    pool.getConnection(function (err, connection) {
+        connection.query(sql2, function (err) {
+            if (err) {
+                bot.sendMessage(msg.chat.id, "Что то пошло не так...2");
+                throw err;
+            } else {
+                bot.sendMessage(msg.chat.id, "База пользователей очищена.");
+                let sql3 = "Insert into users (user_id, request_status, totalSpent, admin, phone) Values ('" + msg.from.id + "','-','0','Админ','')";
+                connection.query(sql3, function (err) {
+                    if (err) {
+                        bot.sendMessage(msg.chat.id, "Что то пошло не так...");
+                        throw err;
+                    } else {
+                        bot.sendMessage(msg.chat.id, "Администратор добавлен.");
+                    }
+                });
+            }
+        });
+        connection.release();
+    });
+}
+
+function turncate_bits_db(msg) {
+    let sql2 = "TRUNCATE TABLE bits";
+    pool.getConnection(function (err, connection) {
+        connection.query(sql2, function (err) {
+            if (err) {
+                bot.sendMessage(msg.chat.id, "Что то пошло не так...");
+                throw err;
+            } else {
+                bot.sendMessage(msg.chat.id, "База пользователей очищена.");
+            }
+        });
+        connection.release();
+    });
+}
+
+
+// Добавить элемент в таблицу SQL
 
 function addBit(chatId, list, userId) {
     let today = new Date();
@@ -211,6 +279,26 @@ function addBitText(chatId, list, userId){
         }
     });
 }
+
+function add_user(list) {
+
+    get_user(list.user_id, function(list){
+        // bot.sendMessage(chatId, "Пользователь уже есть в базе данных.");
+    },
+    function(){
+        let str = "Values ('" + list.user_id + "','-', '0', '" + list.admin + "','-')";
+        let sql3 = "Insert into users (user_id, request_status,totalSpent, admin, phone) " + str;
+        pool.getConnection(function (err, connection) {
+            connection.query(sql3, function (err) {
+            });
+            connection.release();
+        });
+    });
+}
+
+
+// Удалить элемент таблицы SQL
+
 function delete_bits(chatId, demoUniqueAudio_id){
     try{
 
@@ -233,6 +321,9 @@ function delete_bits(chatId, demoUniqueAudio_id){
     
 }
 
+
+// Получить элементы с БД и выполнить функцию
+
 function getBit(demoUniqueAudio_id, callback){
     try{
     let sql2 = "SELECT * FROM bits WHERE demoUniqueAudio_id = '" + demoUniqueAudio_id + "'";
@@ -248,83 +339,6 @@ pool.getConnection(function (error, connection) {
     }catch(err){
         
     }
-}
-function create_users_db(chatId) {
-    let sql2 = "CREATE TABLE users " +
-        "(user_id VARCHAR(255), " +
-        "request_status VARCHAR(255), " +
-        "totalSpent VARCHAR(250), " +
-        "admin VARCHAR(20)," +
-        "phone VARCHAR(50)," +
-        "Id INT not null AUTO_INCREMENT, " +
-        " PRIMARY KEY (Id))";
-    pool.getConnection(function (err, connection) {
-        connection.query(sql2, function (err) {
-            if (err) {
-                bot.sendMessage(chatId, "Что то пошло не так...");
-                throw err;
-            } else {
-                bot.sendMessage(chatId, "База пользователей успешно создана.");
-            }
-        });
-        connection.release();
-    });
-}
-
-function turncate_users_db(msg) {
-
-    let sql2 = "TRUNCATE TABLE users";
-    pool.getConnection(function (err, connection) {
-        connection.query(sql2, function (err) {
-            if (err) {
-                bot.sendMessage(msg.chat.id, "Что то пошло не так...2");
-                throw err;
-            } else {
-                bot.sendMessage(msg.chat.id, "База пользователей очищена.");
-                let sql3 = "Insert into users (user_id, request_status, totalSpent, admin, phone) Values ('" + msg.from.id + "','-','0','Админ','')";
-                connection.query(sql3, function (err) {
-                    if (err) {
-                        bot.sendMessage(msg.chat.id, "Что то пошло не так...");
-                        throw err;
-                    } else {
-                        bot.sendMessage(msg.chat.id, "Администратор добавлен.");
-                    }
-                });
-            }
-        });
-        connection.release();
-    });
-}
-
-function turncate_bits_db(msg) {
-    let sql2 = "TRUNCATE TABLE bits";
-    pool.getConnection(function (err, connection) {
-        connection.query(sql2, function (err) {
-            if (err) {
-                bot.sendMessage(msg.chat.id, "Что то пошло не так...");
-                throw err;
-            } else {
-                bot.sendMessage(msg.chat.id, "База пользователей очищена.");
-            }
-        });
-        connection.release();
-    });
-}
-
-function add_user(list) {
-
-    get_user(list.user_id, function(list){
-        // bot.sendMessage(chatId, "Пользователь уже есть в базе данных.");
-    },
-    function(){
-        let str = "Values ('" + list.user_id + "','-', '0', '" + list.admin + "','-')";
-        let sql3 = "Insert into users (user_id, request_status,totalSpent, admin, phone) " + str;
-        pool.getConnection(function (err, connection) {
-            connection.query(sql3, function (err) {
-            });
-            connection.release();
-        });
-    });
 }
 
 function get_user(userId, callback1, callback2) {
@@ -387,6 +401,9 @@ function get_status(userId, callback1, callback2) {
 
 }
 
+
+// Получить элементы с БД и вывести на экран
+
 function get_allUsers(chatId) {
     try {
         let sql4 = "SELECT * FROM users";
@@ -435,151 +452,7 @@ function get_allUsers(chatId) {
     }
 }
 
-function set_userStatus(userId, status) {
-    try {
-        let sql4 = "UPDATE users SET request_status = '" + status +"' WHERE user_id = '" + userId + "'";
-        pool.getConnection(function (error, connection) {
-            connection.query(sql4, function (err, results) {
-                if (err) {
-                    return false;
-                } else {
-                    return true;
-                }
-
-            });
-            connection.release();
-            if (error) {
-            }
-        });
-
-    } catch (err) {
-    }
-}
-
-function adminFilter(userId, callback){
-    let sql4 = "SELECT * FROM users WHERE user_id = '" + userId + "'";
-    pool.getConnection(function (error, connection) {
-        connection.query(sql4, function (err, results) {
-            if (err) {
-                return false;
-            } else {
-                if (results.length == 0) {
-                    return false;
-                } else {
-                    let list = {
-                        "user_id": results[0].user_id,
-                        "admin": results[0].admin,
-                        "phone": results[0].phone,
-                        "totalSpent": results[0].totalSpent,
-                        "request_status": results[0].request_status
-                    };
-                    if (list.admin == "Админ"){
-                        callback(list);
-                    } else {
-                    }
-                }
-            }
-        });
-    });
-}
-
-function set_userAdmin(msg, userId) {
-    let chatId = msg.chat.id;
-        try {
-            let sql5 = "UPDATE users SET admin = 'Админ' WHERE user_id = '" + userId + "'";
-            pool.getConnection(function (error, connection) {
-                connection.query(sql5, function (err, results) {
-                    if (err) {
-                        bot.sendMessage(chatId, "Что то пошло не так.");
-                        return false;
-                    } else {
-                        bot.sendMessage(chatId, "Пользователю ID: " + userId + " успешно выданы права администратора.");
-                        return true;
-                    }
-
-                });
-                connection.release();
-                if (error) {
-                    bot.sendMessage(chatId, "Что то пошло не так.");
-                }
-            });
-
-        } catch (err) {
-            bot.sendMessage(chatId, "Что то пошло не так.");
-        }
-}
-
-function buttons(chatId, coll, page, allPages) {
-    var txtData = "button__" + chatId + "__" + coll + "__" + page;
-    let resultButtons = {
-        parse_mode: 'HTML'
-    };
-    if (allPages > 1) {
-        if (page == 1) {
-            let resultButtons = {
-                parse_mode: 'HTML',
-                reply_markup: JSON.stringify({
-                    inline_keyboard: [
-                        [{
-                            text: 'Следующая страница',
-                            callback_data: txtData + (+page + 1),
-                        }]
-                    ]
-                })
-            };
-        } else if (page == allPages) {
-
-            let resultButtons = {
-                parse_mode: 'HTML',
-                reply_markup: JSON.stringify({
-                    inline_keyboard: [
-                        [{
-                            text: 'Предыдущая страница',
-                            callback_data: txtData + (+page - 1),
-
-                        }]
-                    ]
-                })
-            };
-        } else {
-            let resultButtons = {
-                parse_mode: 'HTML',
-                reply_markup: JSON.stringify({
-                    inline_keyboard: [
-                        [{
-                            text: 'Предыдущая страница',
-                            callback_data: txtData + (+page - 1),
-                        }],
-                        [{
-                            text: 'Следующая страница',
-                            callback_data: txtData + (+page + 1),
-                        }]
-                    ]
-                })
-            };
-        }
-    } else {
-        let resultButtons = {
-            parse_mode: 'HTML'
-        };
-    }
-    sendTime(0.02, chatId, "Страница " + page + " из " + allPages, resultButtons);
-}
-
-bot.on('message', function (msg) {
-	if (msg.successful_payment != undefined) {
-		var savedPayload = "yyy";	
-		var savedStatus = "zzz";	
-		if ((savedPayload != msg.successful_payment.invoice_payload) || (savedStatus != "WAIT")) {	// match saved data to payment data received
-			bot.sendMessage(msg.chat.id, "Payment verification failed");
-			return;
-		}
-		
-		bot.sendMessage(msg.chat.id, "Payment complete!");
-	}
-});
-
-function getFromBD(chatId, coll, page) {
+function get_allBits(chatId, coll, page) {
     var messageError = "Битов в стиле " + coll + " в данный момент нет.";
 
     try {
@@ -660,6 +533,148 @@ function getFromBD(chatId, coll, page) {
     }
 }
 
+
+// Поменять значение в строке таблицы SQL
+
+function set_userStatus(userId, status) {
+    try {
+        let sql4 = "UPDATE users SET request_status = '" + status +"' WHERE user_id = '" + userId + "'";
+        pool.getConnection(function (error, connection) {
+            connection.query(sql4, function (err, results) {
+                if (err) {
+                    return false;
+                } else {
+                    return true;
+                }
+
+            });
+            connection.release();
+            if (error) {
+            }
+        });
+
+    } catch (err) {
+    }
+}
+
+function set_userAdmin(msg, userId) {
+    let chatId = msg.chat.id;
+        try {
+            let sql5 = "UPDATE users SET admin = 'Админ' WHERE user_id = '" + userId + "'";
+            pool.getConnection(function (error, connection) {
+                connection.query(sql5, function (err, results) {
+                    if (err) {
+                        bot.sendMessage(chatId, "Что то пошло не так.");
+                        return false;
+                    } else {
+                        bot.sendMessage(chatId, "Пользователю ID: " + userId + " успешно выданы права администратора.");
+                        return true;
+                    }
+
+                });
+                connection.release();
+                if (error) {
+                    bot.sendMessage(chatId, "Что то пошло не так.");
+                }
+            });
+
+        } catch (err) {
+            bot.sendMessage(chatId, "Что то пошло не так.");
+        }
+}
+
+
+// Кнопки для перелистывания страниц
+
+function buttons(chatId, coll, page, allPages) {
+    var txtData = "button__" + chatId + "__" + coll + "__" + page;
+    let resultButtons = {
+        parse_mode: 'HTML'
+    };
+    if (allPages > 1) {
+        if (page == 1) {
+            let resultButtons = {
+                parse_mode: 'HTML',
+                reply_markup: JSON.stringify({
+                    inline_keyboard: [
+                        [{
+                            text: 'Следующая страница',
+                            callback_data: txtData + (+page + 1),
+                        }]
+                    ]
+                })
+            };
+        } else if (page == allPages) {
+
+            let resultButtons = {
+                parse_mode: 'HTML',
+                reply_markup: JSON.stringify({
+                    inline_keyboard: [
+                        [{
+                            text: 'Предыдущая страница',
+                            callback_data: txtData + (+page - 1),
+
+                        }]
+                    ]
+                })
+            };
+        } else {
+            let resultButtons = {
+                parse_mode: 'HTML',
+                reply_markup: JSON.stringify({
+                    inline_keyboard: [
+                        [{
+                            text: 'Предыдущая страница',
+                            callback_data: txtData + (+page - 1),
+                        }],
+                        [{
+                            text: 'Следующая страница',
+                            callback_data: txtData + (+page + 1),
+                        }]
+                    ]
+                })
+            };
+        }
+    } else {
+        let resultButtons = {
+            parse_mode: 'HTML'
+        };
+    }
+    sendTime(0.02, chatId, "Страница " + page + " из " + allPages, resultButtons);
+}
+
+// Незавершен
+// Фильтр доступа для комманд администратора
+
+function adminFilter(userId, callback){
+    let sql4 = "SELECT * FROM users WHERE user_id = '" + userId + "'";
+    pool.getConnection(function (error, connection) {
+        connection.query(sql4, function (err, results) {
+            if (err) {
+                return false;
+            } else {
+                if (results.length == 0) {
+                    return false;
+                } else {
+                    let list = {
+                        "user_id": results[0].user_id,
+                        "admin": results[0].admin,
+                        "phone": results[0].phone,
+                        "totalSpent": results[0].totalSpent,
+                        "request_status": results[0].request_status
+                    };
+                    if (list.admin == "Админ"){
+                        callback(list);
+                    } else {
+                    }
+                }
+            }
+        });
+    });
+}
+
+// Дествия при нажатии на кнопки под текстом
+
 bot.on('callback_query', function (callbackQuery) {
     const message = callbackQuery.from.id;
     const txtData = callbackQuery.data.split("__");
@@ -674,7 +689,7 @@ bot.on('callback_query', function (callbackQuery) {
     }else if (type == "button"){
         let coll = txtData[2],
         page = txtData[3];
-        getFromBD(chatId, coll, page);
+        get_allBits(chatId, coll, page);
     }else if (type == "addBitTags"){
         let chatId = txtData[1],
         yesNo = txtData[2],
@@ -721,20 +736,9 @@ bot.on('callback_query', function (callbackQuery) {
 });
 
 
-bot.onText(/delete (.+)/, function (msg, match) {
-    let sql2 = "DELETE FROM bits WHERE demoAudio_id = '" + match[1] + "'";
-    pool.getConnection(function (err, connection) {
-        connection.query(sql2, function (err) {
-            if (err) {
-                bot.sendMessage(chatId, "Что то пошло не так...");
-                throw err;
-            } else {
-                bot.sendMessage(chatId, "Бит удален!\n");
-            }
-        });
-        connection.release();
-    });
-});
+
+
+// Действия при нажатии на кнопки меню
 
 bot.onText(/(.+)/, function (msg, match) {
     let text = match[0];
@@ -801,7 +805,7 @@ bot.onText(/(.+)/, function (msg, match) {
                     bot.sendMessage(chatId, "Вы не выбрали ничего в меню", menu);
                     break;  
                 case "Список всех битов":
-                    getFromBD(msg.chat.id, "-", 1);
+                    get_allBits(msg.chat.id, "-", 1);
                     set_userStatus(msg.from.id, "-");
                     break;
                 case "Дать права администратора":
@@ -844,7 +848,10 @@ bot.onText(/(.+)/, function (msg, match) {
     }
 });
 
-bot.on("audio", function(msg, match){
+
+// Сохранение демки бита в базу данных при отправке mp3
+
+bot.on("audio", function(msg){
 
     let fileID = msg.audio.file_id;
     let file = bot.getFile(fileID);
@@ -865,7 +872,10 @@ bot.on("audio", function(msg, match){
     },function(){});
 });
     
-bot.on("document", function(msg, match){
+
+// Сохранение музыкального пака в базу данных при отправке rar
+
+bot.on("document", function(msg){
     let fileID = msg.document.file_id;
     let file = bot.getFile(fileID);
 
@@ -885,22 +895,83 @@ bot.on("document", function(msg, match){
 });
 
 
+// Очистка баз
 
 bot.onText(/Очистить базу битов/, function (msg) {
     var chatId = msg.chat.id;
     try {adminFilter(msg.from.id, function(){turncate_bits_db(msg);});
     } catch (err) {}
 });
-
 bot.onText(/Очистить базу пользователей/, function (msg) {
     try {
         adminFilter(msg.from.id, function(){turncate_users_db(msg);});
     } catch (err) {
     }
 });
+
+
+// Оплата
+
+function pay(chatId, price, demoUniqueAudio_id){
+    let public_key = "sandbox_i65671457490",
+    private_key = "sandbox_zgnSnNkfrV8oULi57QtuM80Vix3AbfcNTdIpB9ah";
+    var liqpay = new LiqPay(public_key, private_key);
+    liqpay.api("request", {
+        "description": "Покупка бита.",
+        "action": "invoice_bot",
+        "version": "3",
+        "email": "sm.kostya99@gmail.com",
+        "amount": "1",
+        "currency": "UAH",
+        "order_id": "id_"+Date.now(),
+        "phone": "380508660576"
+    }, function(json){
+        console.log(json);
+        if (json.result == "ok"){
+            // var payload = Date.now() * paymentToken;
+            getBit(demoUniqueAudio_id,function(bits){
+
+            
+            let bit = {
+                "price": bits[0].price,
+                "name": "Покупка",
+                "text": bits[0].text
+            };
+            var payload = "" + chatId + Date.now() + price;
+            bot.sendInvoice(chatId, bit.name, bit.text, payload, paymentToken,"pay", "UAH", [{label: bit.name, amount: bit.price}]);
+        });
+                
+        }
+    }, function(error){
+        console.log( error );
+    });
+}
+bot.on('message', function (msg) {
+	if (msg.successful_payment != undefined) {
+		var savedPayload = "yyy";	
+		var savedStatus = "zzz";	
+		if ((savedPayload != msg.successful_payment.invoice_payload) || (savedStatus != "WAIT")) {	// match saved data to payment data received
+			bot.sendMessage(msg.chat.id, "Payment verification failed");
+			return;
+		}
+		
+		bot.sendMessage(msg.chat.id, "Payment complete!");
+	}
+});
+
+
+// Список пользователей и мой ID
+
 bot.onText(/\/myID/, function (msg) {
     bot.sendMessage(msg.chat.id, "Ваш ID:" + msg.from.id);
 });
+bot.onText(/showUsers/, function (msg, match) {
+    get_allUsers(msg.chat.id);
+});
+
+
+// Открыть меню админа
+
 bot.onText(/admin/, function (msg) {
     var chatId = msg.chat.id;
     try {
@@ -910,9 +981,8 @@ bot.onText(/admin/, function (msg) {
     } catch (err) {}
 });
 
-bot.onText(/showUsers/, function (msg, match) {
-    get_allUsers(msg.chat.id);
-});
+
+// Начало работы с ботом
 
 bot.onText(/\/start/, function (msg) {
 
@@ -928,7 +998,7 @@ bot.onText(/\/start/, function (msg) {
 });
 
 
-
+// Описание работы бота
 
 let helpMessage = "...";
 
